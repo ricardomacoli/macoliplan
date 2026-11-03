@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#FBFAFD">
+<title>Realize — Área do planejador</title>
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://script.google.com">
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #EFECF7; }
+  .carregando, .aviso {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px; padding: 0 24px; text-align: center;
+    font-family: Jost, "Century Gothic", "Segoe UI", Arial, sans-serif; color: #7A4A61; font-size: 14px;
+  }
+  .carregando strong, .aviso strong { font-size: 22px; letter-spacing: .14em; color: #4C1130; }
+  .aviso { display: none; background: #EFECF7; z-index: 2; line-height: 1.6; font-size: 15px; }
+  .aviso p { max-width: 420px; margin: 0; }
+  iframe {
+    position: fixed; inset: 0; display: block; border: 0; background: transparent;
+    width: 100%; height: 100%; height: 100dvh;
+  }
+</style>
+</head>
+<body>
+
+<div class="carregando" aria-hidden="true"><strong>REALIZE</strong><span>Área do planejador…</span></div>
+<div class="aviso" id="aviso" role="alert">
+  <strong>REALIZE</strong>
+  <p id="avisoTxt"></p>
+</div>
+
+<iframe id="app" title="Realize — Área do planejador"
+  allow="clipboard-read; clipboard-write; fullscreen"
+  referrerpolicy="no-referrer"></iframe>
+
+<script>
+(function () {
+  /* Endereço do app (termina em /exec) — o MESMO do realizepgf. */
+  var APP = "https://script.google.com/macros/s/AKfycbxhork4TRVF3JH7xyoOtgDP8dtgSfGHrOwovCLuO0f2AvH0Isj29PJ870odoD9JJMtH/exec";
+
+  /* Chave do planejador: chega UMA vez pelo link completo (…/#chave), fica guardada
+     neste aparelho e sai do endereço — não aparece na tela nem em capturas.
+     Para esquecer este aparelho: abra este endereço com #esquecer no final. */
+  var GUARDA = "macoliplan_chave";
+  var chave = "";
+  var hash = location.hash.replace(/^#/, "");
+  try {
+    if (hash === "esquecer") localStorage.removeItem(GUARDA);
+    else if (/^[a-f0-9]{32}$/i.test(hash)) localStorage.setItem(GUARDA, hash.toLowerCase());
+    chave = localStorage.getItem(GUARDA) || "";
+  } catch (e) {
+    if (/^[a-f0-9]{32}$/i.test(hash)) chave = hash.toLowerCase();   // navegador sem armazenamento: vale só agora
+  }
+  if (hash) { try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {} }
+
+  function limpar(origem) {
+    var ok = {};
+    Object.keys(origem || {}).forEach(function (k) {
+      var v = String(origem[k] == null ? "" : origem[k]);
+      if (/^[a-z]{1,12}$/i.test(k) && /^[A-Za-z0-9_-]{1,40}$/.test(v)) ok[k] = v;
+    });
+    return ok;
+  }
+  function busca(par) {
+    var q = Object.keys(par).map(function (k) {
+      return encodeURIComponent(k) + "=" + encodeURIComponent(par[k]);
+    }).join("&");
+    return q ? "?" + q : "";
+  }
+  function avisar(txt) {
+    document.getElementById("avisoTxt").textContent = txt;
+    document.getElementById("aviso").style.display = "flex";
+  }
+
+  var inicial = {};
+  new URLSearchParams(location.search).forEach(function (v, k) { inicial[k] = v; });
+  inicial = limpar(inicial);
+  delete inicial.k;
+  if (!inicial.p) inicial.p = "controle";
+
+  // A liberação (link do e-mail de alerta) não precisa da chave; o resto precisa.
+  if (inicial.p !== "liberar" && !chave) {
+    avisar(hash === "esquecer"
+      ? "Este aparelho foi esquecido. Para usar de novo, abra o link completo do planejador."
+      : "Este aparelho ainda não está autorizado. Abra o link completo do planejador — na planilha: Planejamento › Endereço do planejador.");
+    return;
+  }
+  if (chave && inicial.p !== "liberar") inicial.k = chave;
+  inicial.embed = "1";
+  document.getElementById("app").src = APP + busca(inicial);
+
+  /* O app avisa qual tela está aberta; o endereço acompanha (F5 e voltar funcionam). */
+  window.addEventListener("message", function (e) {
+    if (!/^https:\/\/[a-z0-9.-]+\.googleusercontent\.com$/i.test(e.origin)) return;
+    var d = e.data;
+    if (!d || d.realize !== "rota" || typeof d.par !== "object") return;
+    var par = limpar(d.par);
+    delete par.embed; delete par.sair; delete par.k; delete par.lib;
+    if (par.p === "controle" && Object.keys(par).length === 1) par = {};   // tela inicial: endereço limpo
+    try { history.replaceState(null, "", location.pathname + busca(par)); } catch (err) {}
+    if (d.titulo && typeof d.titulo === "string") document.title = d.titulo.slice(0, 120);
+  });
+})();
+</script>
+</body>
+</html>
