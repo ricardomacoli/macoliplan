@@ -11,14 +11,12 @@
 <link rel="preconnect" href="https://script.google.com">
 <style>
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #EFECF7; }
-  .carregando, .aviso {
+  .carregando {
     position: fixed; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 10px; padding: 0 24px; text-align: center;
+    align-items: center; justify-content: center; gap: 10px;
     font-family: Jost, "Century Gothic", "Segoe UI", Arial, sans-serif; color: #7A4A61; font-size: 14px;
   }
-  .carregando strong, .aviso strong { font-size: 22px; letter-spacing: .14em; color: #4C1130; }
-  .aviso { display: none; background: #EFECF7; z-index: 2; line-height: 1.6; font-size: 15px; }
-  .aviso p { max-width: 420px; margin: 0; }
+  .carregando strong { font-size: 22px; letter-spacing: .14em; color: #4C1130; }
   iframe {
     position: fixed; inset: 0; display: block; border: 0; background: transparent;
     width: 100%; height: 100%; height: 100dvh;
@@ -28,34 +26,21 @@
 <body>
 
 <div class="carregando" aria-hidden="true"><strong>REALIZE</strong><span>Área do planejador…</span></div>
-<div class="aviso" id="aviso" role="alert">
-  <strong>REALIZE</strong>
-  <p id="avisoTxt"></p>
-</div>
 
 <iframe id="app" title="Realize — Área do planejador"
   allow="clipboard-read; clipboard-write; fullscreen"
   referrerpolicy="no-referrer"></iframe>
 
+<noscript>
+  <p style="position:fixed;bottom:16px;left:0;right:0;text-align:center;font-family:Arial;color:#9C2A2A">
+    A plataforma precisa de JavaScript habilitado no navegador.
+  </p>
+</noscript>
+
 <script>
 (function () {
   /* Endereço do app (termina em /exec) — o MESMO do realizepgf. */
   var APP = "https://script.google.com/macros/s/AKfycbxhork4TRVF3JH7xyoOtgDP8dtgSfGHrOwovCLuO0f2AvH0Isj29PJ870odoD9JJMtH/exec";
-
-  /* Chave do planejador: chega UMA vez pelo link completo (…/#chave), fica guardada
-     neste aparelho e sai do endereço — não aparece na tela nem em capturas.
-     Para esquecer este aparelho: abra este endereço com #esquecer no final. */
-  var GUARDA = "macoliplan_chave";
-  var chave = "";
-  var hash = location.hash.replace(/^#/, "");
-  try {
-    if (hash === "esquecer") localStorage.removeItem(GUARDA);
-    else if (/^[a-f0-9]{32}$/i.test(hash)) localStorage.setItem(GUARDA, hash.toLowerCase());
-    chave = localStorage.getItem(GUARDA) || "";
-  } catch (e) {
-    if (/^[a-f0-9]{32}$/i.test(hash)) chave = hash.toLowerCase();   // navegador sem armazenamento: vale só agora
-  }
-  if (hash) { try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {} }
 
   function limpar(origem) {
     var ok = {};
@@ -71,25 +56,14 @@
     }).join("&");
     return q ? "?" + q : "";
   }
-  function avisar(txt) {
-    document.getElementById("avisoTxt").textContent = txt;
-    document.getElementById("aviso").style.display = "flex";
-  }
 
+  /* Abre o Controle (ou a tela pedida no endereço) já como área do planejador:
+     o app pede o PIN logo de início. */
   var inicial = {};
   new URLSearchParams(location.search).forEach(function (v, k) { inicial[k] = v; });
   inicial = limpar(inicial);
-  delete inicial.k;
   if (!inicial.p) inicial.p = "controle";
-
-  // A liberação (link do e-mail de alerta) não precisa da chave; o resto precisa.
-  if (inicial.p !== "liberar" && !chave) {
-    avisar(hash === "esquecer"
-      ? "Este aparelho foi esquecido. Para usar de novo, abra o link completo do planejador."
-      : "Este aparelho ainda não está autorizado. Abra o link completo do planejador — na planilha: Planejamento › Endereço do planejador.");
-    return;
-  }
-  if (chave && inicial.p !== "liberar") inicial.k = chave;
+  if (inicial.p !== "liberar") inicial.ent = "plan";
   inicial.embed = "1";
   document.getElementById("app").src = APP + busca(inicial);
 
@@ -99,7 +73,7 @@
     var d = e.data;
     if (!d || d.realize !== "rota" || typeof d.par !== "object") return;
     var par = limpar(d.par);
-    delete par.embed; delete par.sair; delete par.k; delete par.lib;
+    delete par.embed; delete par.sair; delete par.ent; delete par.k; delete par.lib;
     if (par.p === "controle" && Object.keys(par).length === 1) par = {};   // tela inicial: endereço limpo
     try { history.replaceState(null, "", location.pathname + busca(par)); } catch (err) {}
     if (d.titulo && typeof d.titulo === "string") document.title = d.titulo.slice(0, 120);
